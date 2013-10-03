@@ -28,6 +28,7 @@
 
 
 #include "lispd_input.h"
+#include "andrea.h"
 
 void process_input_packet(int fd,
                           int afi,
@@ -62,6 +63,7 @@ void process_input_packet(int fd,
         return;
     }
 
+    lispd_log_msg(LISP_LOG_INFO, "packet received");
     if(afi == AF_INET){
         /* With input RAW UDP sockets in IPv4, we get the whole external IPv4 packet */
         udph = (struct udphdr *) CO(packet,sizeof(struct iphdr));
@@ -71,43 +73,76 @@ void process_input_packet(int fd,
     }
     
     /* With input RAW UDP sockets, we receive all UDP packets, we only want lisp data ones */
-    if(ntohs(udph->dest) != LISP_DATA_PORT){
+    if(ntohs(udph->dest) != LISP_DATA_PORT
+    		&& ntohs(udph->source) != RADIUS_PORT
+    		&& ntohs(udph->dest) != DHCP_PORT)
+    {
         free(packet);
         //lispd_log_msg(LISP_LOG_DEBUG_3,"INPUT (No LISP data): UDP dest: %d ",ntohs(udph->dest));
         return;
     }
 
-    lisp_hdr = (struct lisphdr *) CO(udph,sizeof(struct udphdr));
+    /* LISP packet (normal lispmob) */
+    if(ntohs(udph->dest) == LISP_DATA_PORT)
+    {
+		lisp_hdr = (struct lisphdr *) CO(udph,sizeof(struct udphdr));
 
-    length = length - sizeof(struct udphdr) - sizeof(struct lisphdr);
+		length = length - sizeof(struct udphdr) - sizeof(struct lisphdr);
+
+		iph = (struct iphdr *) CO(lisp_hdr,sizeof(struct lisphdr));
+
+		lispd_log_msg(LISP_LOG_DEBUG_3,"INPUT (4341): Inner src: %s | Inner dst: %s ",
+					  get_char_from_lisp_addr_t(extract_src_addr_from_packet((char *)iph)),
+					  get_char_from_lisp_addr_t(extract_dst_addr_from_packet((char *)iph)));
+
+		if (iph->version == 4) {
+
+			if(ttl!=0){ /*XXX It seems that there is a bug in uClibc that causes ttl=0 in OpenWRT. This is a quick workaround */
+				iph->ttl = ttl;
+			}
+			iph->tos = tos;
+
+			/* We need to recompute the checksum since we have changed the TTL and TOS header fields */
+			iph->check = 0; /* New checksum must be computed with the checksum header field with 0s */
+			iph->check = ip_checksum((uint16_t*) iph, sizeof(struct iphdr));
+
+		}else{
+			ip6h = ( struct ip6_hdr *) iph;
+
+			if(ttl!=0){ /*XXX It seems that there is a bug in uClibc that causes ttl=0 in OpenWRT. This is a quick workaround */
+				ip6h->ip6_hops = ttl; /* ttl = Hops limit in IPv6 */
+			}
+
+			IPV6_SET_TC(ip6h,tos); /* tos = Traffic class field in IPv6 */
+		}
+
+    }
     
-    iph = (struct iphdr *) CO(lisp_hdr,sizeof(struct lisphdr));
 
-    lispd_log_msg(LISP_LOG_DEBUG_3,"INPUT (4341): Inner src: %s | Inner dst: %s ",
-                  get_char_from_lisp_addr_t(extract_src_addr_from_packet((char *)iph)),
-                  get_char_from_lisp_addr_t(extract_dst_addr_from_packet((char *)iph)));
-    
-    if (iph->version == 4) {
-        
-        if(ttl!=0){ /*XXX It seems that there is a bug in uClibc that causes ttl=0 in OpenWRT. This is a quick workaround */
-            iph->ttl = ttl;
-        }
-        iph->tos = tos;
+    /* RADIUS packet */
+    if (ntohs(udph->source) == RADIUS_PORT)
+    {
+		lispd_log_msg(LISP_LOG_INFO, "RADIUS!");
 
-        /* We need to recompute the checksum since we have changed the TTL and TOS header fields */
-        iph->check = 0; /* New checksum must be computed with the checksum header field with 0s */
-        iph->check = ip_checksum((uint16_t*) iph, sizeof(struct iphdr));
-        
-    }else{
-        ip6h = ( struct ip6_hdr *) iph;
+		struct radius_packet rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
 
-        if(ttl!=0){ /*XXX It seems that there is a bug in uClibc that causes ttl=0 in OpenWRT. This is a quick workaround */
-            ip6h->ip6_hops = ttl; /* ttl = Hops limit in IPv6 */
-        }
-        
-        IPV6_SET_TC(ip6h,tos); /* tos = Traffic class field in IPv6 */
+		iph = (struct iphdr *) packet;
+
+		//char str[80];
+		//sprintf(str, "iph->saddr = %d", ntohs(iph->saddr));
+
+		char source[16];
+		snprintf(source, 16, "%pI4", &iph->saddr); // Mind the &!
+		lispd_log_msg(LISP_LOG_INFO, source);
+
+
+		char radaddr[16];
+		strcpy(radaddr, "147.83.42.146");
+		if (strcmp(source, strtoul(radaddr, NULL, strlen(radaddr))) == 0)
+			lispd_log_msg(LISP_LOG_INFO, "RADIUS en serio");
     }
 
+    
     if ((write(tun_receive_fd, iph, length)) < 0){
         lispd_log_msg(LISP_LOG_DEBUG_2,"lisp_input: write error: %s\n ", strerror(errno));
     }
