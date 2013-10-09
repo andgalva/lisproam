@@ -8,6 +8,7 @@
 #ifndef ANDREA_H_
 #define ANDREA_H_
 
+#include <netinet/in.h>
 #include "radius.h"
 
 #define RADIUS_PORT       1812

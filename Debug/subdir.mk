@@ -33,6 +33,7 @@ O_SRCS += \
 ../lispd_tun.o 
 
 C_SRCS += \
+../andrea.c \
 ../cksum.c \
 ../cmdline.c \
 ../lispd.c \
@@ -62,6 +63,7 @@ C_SRCS += \
 ../lispd_tun.c 
 
 OBJS += \
+./andrea.o \
 ./cksum.o \
 ./cmdline.o \
 ./lispd.o \
@@ -91,6 +93,7 @@ OBJS += \
 ./lispd_tun.o 
 
 C_DEPS += \
+./andrea.d \
 ./cksum.d \
 ./cmdline.d \
 ./lispd.d \

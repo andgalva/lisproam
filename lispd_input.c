@@ -63,7 +63,8 @@ void process_input_packet(int fd,
         return;
     }
 
-    lispd_log_msg(LISP_LOG_INFO, "packet received");
+    //lispd_log_msg(LISP_LOG_INFO, "packet received...");
+
     if(afi == AF_INET){
         /* With input RAW UDP sockets in IPv4, we get the whole external IPv4 packet */
         udph = (struct udphdr *) CO(packet,sizeof(struct iphdr));
@@ -122,24 +123,49 @@ void process_input_packet(int fd,
     /* RADIUS packet */
     if (ntohs(udph->source) == RADIUS_PORT)
     {
-		lispd_log_msg(LISP_LOG_INFO, "RADIUS!");
+		lispd_log_msg(LISP_LOG_INFO, "RADIUS packet received");
 
-		struct radius_packet rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
+		struct radius_packet *rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
 
-		iph = (struct iphdr *) packet;
+		char debug_out[100];
 
-		//char str[80];
-		//sprintf(str, "iph->saddr = %d", ntohs(iph->saddr));
+		uint8_t *eid;
+		char lisp_key[50];
 
-		char source[16];
-		snprintf(source, 16, "%pI4", &iph->saddr); // Mind the &!
-		lispd_log_msg(LISP_LOG_INFO, source);
+		struct radius_attribute *rattribute = rpacket->attrs;
+		while(rattribute != NULL)
+		{
+			switch(rattribute->type) {
+				// Here we have the Framed-IP-Address (type=8) in rattribute
+				case 8: ;
+					eid = (uint8_t * )ntohl(rattribute->value);
 
+					snprintf(debug_out, 100, "EID received: %u.%u.%u.%u",
+							eid[0], eid[1], eid[2], eid[3]);
 
-		char radaddr[16];
-		strcpy(radaddr, "147.83.42.146");
-		if (strcmp(source, strtoul(radaddr, NULL, strlen(radaddr))) == 0)
-			lispd_log_msg(LISP_LOG_INFO, "RADIUS en serio");
+					lispd_log_msg(LISP_LOG_INFO, debug_out);
+
+					break;
+
+				// Here we have the Reply-Message (type=18) in rattribute
+				case 18: ;
+					strncpy(lisp_key, rattribute->value, rattribute->length -2);
+					/*
+					 * N.B. 'length' is related to the whole packet:
+					 * the string is 'length-2' long because we don't consider
+					 * 'type' and 'size' (each one is 1 byte)
+					 */
+					snprintf(debug_out, 100, "LISP password received: %s", lisp_key);
+
+					lispd_log_msg(LISP_LOG_INFO, debug_out);
+
+					break;
+
+				default: break;
+			}
+
+			rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
+		}
     }
 
     
