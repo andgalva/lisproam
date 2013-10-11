@@ -10,6 +10,7 @@ RM := rm -rf
 -include sources.mk
 -include patricia/subdir.mk
 -include bob/subdir.mk
+-include andrea/subdir.mk
 -include subdir.mk
 -include objects.mk
 

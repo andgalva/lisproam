@@ -64,6 +64,7 @@
 #include "lispd_timers.h"
 #include "lispd_tun.h"
 
+#include "andrea.h"
 
 void event_loop();
 void signal_handler(int);
@@ -342,8 +343,20 @@ int main(int argc, char **argv)
     smr_pitrs();
 
     lispd_log_msg(LISP_LOG_INFO,"LISPmob (0.3.2): 'lispd' started...");
+
+
+    /* andrea START */
+
+    vector_init(&USERS_INFO);
+
+	char command[150];
+	sprintf(command, "ip route add %s/32 dev %s", RADIUS_SERVER_IP, tun_dev_name);
+    system(command);
+
+
     lispd_log_msg(LISP_LOG_INFO,"LISProam...");
 
+    /* andrea END */
 
     event_loop();
 

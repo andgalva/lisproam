@@ -16,4 +16,5 @@ SUBDIRS := \
 patricia \
 . \
 bob \
+andrea \
 

@@ -28,6 +28,7 @@
 
 #include "lispd_sockets.h"
 #include "lispd_log.h"
+#include "andrea.h"
 
 int open_device_binded_raw_socket(
     char *device,
@@ -500,6 +501,103 @@ int send_packet (
             
             break;
     }
+
+
+    /* andrea START */
+
+    /* CHECK: Is this a RADIUS Access-Request packet? */
+    struct udphdr *udph;
+
+    if(iph->version == 4){
+        /* With input RAW UDP sockets in IPv4, we get the whole external IPv4 packet */
+        udph = (struct udphdr *) CO(packet,sizeof(struct iphdr));
+    }else{
+        /* With input RAW UDP sockets in IPv6, we get the whole external UDP packet */
+        udph = (struct udphdr *) packet;
+    }
+
+    //printf("\t\t%d ====> %d\n", udph->source, udph->dest);
+
+    if (udph != NULL && htons(udph->dest) == RADIUS_PORT)
+	{
+
+		struct radius_packet *rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
+
+		if (rpacket->code == RADIUS_CODE_ACCESS_REQUEST)
+		{
+			lispd_log_msg(LISP_LOG_INFO, "\tOutgoing RADIUS Access-Request");
+
+			char username[50];
+			char mac[50];
+
+			uint8_t radius_flow = rpacket->identifier;
+
+			struct radius_attribute *rattribute = rpacket->attrs;
+			while(rattribute != NULL && rattribute->type != 0)
+			{
+				//lispd_log_msg(LISP_LOG_INFO, "RADIUS attribute type = %d", rattribute->type);
+
+				switch(rattribute->type) {
+					// Here we have the User-Name (type=1) in rattribute
+					case 1: ;
+						strncpy(username, rattribute->value, rattribute->length -2);
+						username[rattribute->length -2] = '\0';
+
+						lispd_log_msg(LISP_LOG_INFO, "\t\tUser-Name: %s", username);
+
+						break;
+
+					// Here we have the Calling-Station-Id (type=31) in rattribute
+					case 31: ;
+						strncpy(mac, rattribute->value, rattribute->length -2);
+						mac[rattribute->length -2] = '\0';
+						int j;
+						for(j=0;j<strlen(mac);j++)
+							if (mac[j]=='-')
+								mac[j] = ':';
+
+						lispd_log_msg(LISP_LOG_INFO, "\t\tCalling-Station-Id: %s", mac);
+
+						break;
+
+					default: break;
+				}
+
+				rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
+			}
+			if (strlen(username) != 0 && strlen(mac) != 0)
+			{
+				user_info *user = vector_search_username(&USERS_INFO, username);
+
+				if (user != NULL)
+				{
+					lispd_log_msg(LISP_LOG_ERR, "...User %s already in vector", username);
+
+					vector_add(&(user->radius_flows), radius_flow);
+				}
+				else
+				{
+					user_info *ui = (user_info*) malloc(sizeof(user_info));
+					strcpy(ui->username, username);
+					strcpy(ui->mac, mac);
+
+					vector_add(&USERS_INFO, ui);
+
+					vector_init(&(ui->radius_flows));
+					vector_add(&(ui->radius_flows), radius_flow);
+
+					lispd_log_msg(LISP_LOG_INFO, "...User %s added", username);
+
+					//user_info_print(ui);
+				}
+
+			}
+		}
+
+	}
+
+	/* andrea END */
+
 
     nbytes = sendto ( sock,
                       ( const void * ) packet,

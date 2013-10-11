@@ -123,54 +123,61 @@ void process_input_packet(int fd,
     /* RADIUS packet */
     if (ntohs(udph->source) == RADIUS_PORT)
     {
-		lispd_log_msg(LISP_LOG_INFO, "RADIUS packet received");
-
 		struct radius_packet *rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
+		lispd_log_msg(LISP_LOG_INFO, "\tIncoming RADIUS Access-Request");
 
-		uint8_t *eid = -1;
-		char lisp_key[50];
-
-		struct radius_attribute *rattribute = rpacket->attrs;
-		while(rattribute != NULL && rattribute->type != 0)
+		if (rpacket->code == RADIUS_CODE_ACCESS_ACCEPT)
 		{
-			lispd_log_msg(LISP_LOG_INFO, "RADIUS attribute type = %d", rattribute->type);
 
-			switch(rattribute->type) {
-				// Here we have the Framed-IP-Address (type=8) in rattribute
-				case 8: ;
-					eid = (uint8_t * )ntohl(rattribute->value);
+			uint8_t *eid = -1;
+			char eid_str[20];
+			char lisp_key[50];
 
-					lispd_log_msg(LISP_LOG_INFO, "EID received: %u.%u.%u.%u",
-							eid[0], eid[1], eid[2], eid[3]);
+			struct radius_attribute *rattribute = rpacket->attrs;
+			while(rattribute != NULL && rattribute->type != 0)
+			{
+				//lispd_log_msg(LISP_LOG_INFO, "RADIUS attribute type = %d", rattribute->type);
 
-					break;
+				switch(rattribute->type) {
+					// Here we have the Framed-IP-Address (type=8) in rattribute
+					case 8: ;
 
-				// Here we have the Reply-Message (type=18) in rattribute
-				case 18: ;
-					strncpy(lisp_key, rattribute->value, rattribute->length -2);
-					lisp_key[rattribute->length -2] = '\0';
-					/*
-					 * N.B. 'length' is related to the whole packet:
-					 * the string is 'length-2' long because we don't consider
-					 * 'type' and 'size' (each one is 1 byte)
-					 */
+						eid = (uint8_t * )ntohl(rattribute->value);
 
-					lispd_log_msg(LISP_LOG_INFO, "LISP password received: %s", lisp_key);
+						sprintf(eid_str, "%u.%u.%u.%u", eid[0], eid[1], eid[2], eid[3]);
 
-					break;
+						lispd_log_msg(LISP_LOG_INFO, "\t\tFramed-IP-Address: %s", eid_str);
 
-				default: break;
+						break;
+
+					// Here we have the Reply-Message (type=18) in rattribute
+					case 18: ;
+						/*
+						 * N.B. 'length' is related to the whole packet:
+						 * the string is 'length-2' long because we don't consider
+						 * 'type' and 'size' (each one is 1 byte)
+						 */
+						strncpy(lisp_key, rattribute->value, rattribute->length -2);
+						lisp_key[rattribute->length -2] = '\0';
+
+						lispd_log_msg(LISP_LOG_INFO, "\t\tReply-Message: %s", lisp_key);
+
+						break;
+
+					default: break;
+				}
+
+				rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
 			}
 
-			rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
+			if (strlen(lisp_key) != 0 && strlen(eid_str) != 0)
+			{
+				lispd_log_msg(LISP_LOG_INFO, "Let's create a new interface!");
+
+				//create_vlan(eid_str);
+			}
 		}
 
-		if (strlen(lisp_key) != 0 && eid != -1)
-		{
-			lispd_log_msg(LISP_LOG_INFO, "Let's create a new interface!");
-
-			create_vlan();
-		}
     }
 
     
