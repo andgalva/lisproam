@@ -64,13 +64,19 @@
 #include "lispd_timers.h"
 #include "lispd_tun.h"
 
-#include "andrea.h"
+#include "andrea/andrea.h"
 
 void event_loop();
 void signal_handler(int);
 void exit_cleanup(void);
 
 
+/* andrea START */
+
+vector USERS_INFO;
+char WLAN_INTERFACE[50];
+
+/* andrea END */
 
 /*
  *      config paramaters
@@ -126,7 +132,12 @@ int main(int argc, char **argv)
     lisp_addr_t *tun_v6_addr;
     char *tun_dev_name = TUN_IFACE_NAME;
 
+    /* XXX andrea start */
 
+    // LOCAL testbed
+    signal(SIGUSR1, create_mock_user);
+
+    /* XXX andrea end */
 
 #ifdef ROUTER
 #ifdef OPENWRT
@@ -345,18 +356,30 @@ int main(int argc, char **argv)
     lispd_log_msg(LISP_LOG_INFO,"LISPmob (0.3.2): 'lispd' started...");
 
 
-    /* andrea START */
+    /* XXX andrea START */
 
     vector_init(&USERS_INFO);
 
 	char command[150];
+
+	// In my case, the RADIUS Server is under the same /24 as the xTR
+	// so we add an additional specific route, unless it can't be reached
+	// when LISP is running
 	sprintf(command, "ip route add %s/32 dev %s", RADIUS_SERVER_IP, tun_dev_name);
     system(command);
 
+    // wlan interface has to be set with an address (ANY) in order to work with dnsmasq
+    sprintf(command, "ifconfig %s 1.1.1.1", WLAN_INTERFACE);
+    system(command);
 
-    lispd_log_msg(LISP_LOG_INFO,"LISProam...");
+    lispd_log_msg(LISP_LOG_INFO,"\n"
+    							"************\n"
+    							"**LISProam**\n"
+    							"************");
+    lispd_log_msg(LISP_LOG_INFO,"Waiting for connections on interface: %s", WLAN_INTERFACE);
 
-    /* andrea END */
+    /* XXX andrea END */
+
 
     event_loop();
 

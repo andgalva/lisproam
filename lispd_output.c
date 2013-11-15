@@ -308,7 +308,6 @@ int forward_native(
     lispd_log_msg(LISP_LOG_DEBUG_3, "Fordwarding native for destination %s",
             get_char_from_lisp_addr_t(extract_dst_addr_from_packet(packet_buf)));
 
-
     ret = send_packet(output_socket,packet_buf,pckt_length);
 
     return (ret);
@@ -520,9 +519,8 @@ int select_src_rmt_locators_from_balancing_locators_vec (
     lispd_locator_elt       **src_loc_vec   = NULL;
     lispd_locator_elt       **dst_loc_vec   = NULL;
 
-    src_blv = &((lcl_mapping_extended_info *)(src_mapping->extended_info))->outgoing_balancing_locators_vecs;
+    src_blv = &(((lcl_mapping_extended_info *)(src_mapping->extended_info))->outgoing_balancing_locators_vecs);
     dst_blv = &((rmt_mapping_extended_info *)(dst_mapping->extended_info))->rmt_balancing_locators_vecs;
-
 
     if (src_blv->balancing_locators_vec != NULL && dst_blv->balancing_locators_vec != NULL){
         src_loc_vec = src_blv->balancing_locators_vec;
@@ -541,7 +539,6 @@ int select_src_rmt_locators_from_balancing_locators_vec (
         }
         return (BAD);
     }
-
     hash = get_hash_from_tuple (tuple);
     if (hash == 0){
         lispd_log_msg(LISP_LOG_DEBUG_1,"get_rloc_from_tuple: Couldn't get the hash of the tuple to select the rloc. Using the default rloc");
@@ -549,7 +546,10 @@ int select_src_rmt_locators_from_balancing_locators_vec (
         *dst_locator = dst_loc_vec[0];
     }
     pos = hash%src_vec_len;
-    *src_locator =  src_loc_vec[pos];
+
+    // XXX andrea: FIX outer_src_locator->extended_info
+    //*src_locator =  src_loc_vec[pos];
+    *src_locator = src_mapping->head_v4_locators_list->locator;
 
     switch ((*src_locator)->locator_addr->afi){
     case (AF_INET):
@@ -561,8 +561,11 @@ int select_src_rmt_locators_from_balancing_locators_vec (
         dst_vec_len = dst_blv->v6_locators_vec_length;
         break;
     }
-    pos = hash%dst_vec_len;
-    *dst_locator =  dst_loc_vec[pos];
+    pos = hash%dst_vec_len; pos = 0;
+
+    // XXX andrea: FIX outer_src_locator->extended_info
+    //*dst_locator =  dst_loc_vec[pos];
+    *dst_locator = dst_mapping->head_v4_locators_list->locator;
 
     lispd_log_msg(LISP_LOG_DEBUG_3,"select_src_rmt_locators_from_balancing_locators_vec: "
             "src EID: %s, rmt EID: %s, protocol: %d, src port: %d , dst port: %d --> src RLOC: %s, dst RLOC: %s",
@@ -672,7 +675,6 @@ int lisp_output (
 
 
     /* If already LISP packet, do not encapsulate again */
-
     if (is_lisp_packet(original_packet,original_packet_length) == TRUE){
         return (forward_native(original_packet,original_packet_length));
     }
@@ -682,6 +684,9 @@ int lisp_output (
     if (src_mapping == NULL){
         return (forward_native(original_packet,original_packet_length));
     }
+    // XXX andrea
+    lispd_log_msg(LISP_LOG_INFO," 3 src_mapping->extended_info==NULL? %s src_mapping->head_v4_locators_list==NULL? %s", src_mapping->extended_info==NULL? "yes" : "no", src_mapping->head_v4_locators_list==NULL? "yes" : "no" );
+    lispd_log_msg(LISP_LOG_INFO," 3 src_mapping->extended_info->outgoing_balancing_locators_vecs.v4_locators_vec_length = %d", ( (lcl_mapping_extended_info*)src_mapping->extended_info)->outgoing_balancing_locators_vecs.v4_locators_vec_length);
 
     entry = lookup_map_cache(tuple.dst_addr);
 
@@ -690,6 +695,7 @@ int lisp_output (
         lispd_log_msg(LISP_LOG_DEBUG_1, "No map cache retrieved for eid %s",get_char_from_lisp_addr_t(tuple.dst_addr));
         handle_map_cache_miss(&(tuple.dst_addr), &(tuple.src_addr));
     }
+
     /* Packets with negative map cache entry, no active map cache entry or no map cache entry are forwarded to PETR */
     if ((entry == NULL) || (entry->active == NO_ACTIVE) || (entry->mapping->locator_count == 0) ){ /* There is no entry or is not active*/
 
@@ -749,7 +755,9 @@ int lisp_output (
             &encap_packet,
             &encap_packet_size);
 
-    send_packet (((lcl_locator_extended_info *)(outer_src_locator->extended_info))->out_socket,encap_packet,encap_packet_size);
+    // XXX andrea: FIX outer_src_locator->extended_info
+    //send_packet (((lcl_locator_extended_info *)(outer_src_locator->extended_info))->out_socket,encap_packet,encap_packet_size);
+    send_packet (3,encap_packet,encap_packet_size);
 
     free (encap_packet);
 

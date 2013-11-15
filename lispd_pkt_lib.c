@@ -62,6 +62,7 @@ int pkt_get_mapping_record_length(lispd_mapping_elt *mapping)
             continue;
         loc_length += get_locators_length(locators_list[ctr]);
     }
+
     eid_length = get_mapping_length(mapping);
     length = sizeof(lispd_pkt_mapping_record_t) + eid_length +
             (mapping->locator_count * sizeof(lispd_pkt_mapping_record_locator_t)) +

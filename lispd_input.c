@@ -28,7 +28,9 @@
 
 
 #include "lispd_input.h"
-#include "andrea.h"
+#include "lispd_map_reply.h"
+#include "andrea/andrea.h"
+#include <ctype.h>
 
 void process_input_packet(int fd,
                           int afi,
@@ -63,8 +65,6 @@ void process_input_packet(int fd,
         return;
     }
 
-    //lispd_log_msg(LISP_LOG_INFO, "packet received...");
-
     if(afi == AF_INET){
         /* With input RAW UDP sockets in IPv4, we get the whole external IPv4 packet */
         udph = (struct udphdr *) CO(packet,sizeof(struct iphdr));
@@ -76,7 +76,7 @@ void process_input_packet(int fd,
     /* With input RAW UDP sockets, we receive all UDP packets, we only want lisp data ones */
     if(ntohs(udph->dest) != LISP_DATA_PORT
     		&& ntohs(udph->source) != RADIUS_PORT
-    		&& ntohs(udph->dest) != DHCP_PORT)
+    		&& ntohs(udph->dest) != LISP_CONTROL_PORT)
     {
         free(packet);
         //lispd_log_msg(LISP_LOG_DEBUG_3,"INPUT (No LISP data): UDP dest: %d ",ntohs(udph->dest));
@@ -117,21 +117,28 @@ void process_input_packet(int fd,
 			IPV6_SET_TC(ip6h,tos); /* tos = Traffic class field in IPv6 */
 		}
 
+	    /* LISP packets must be forwarded */
+	    if ((write(tun_receive_fd, iph, length)) < 0){
+	        lispd_log_msg(LISP_LOG_DEBUG_2,"lisp_input: write error: %s\n ", strerror(errno));
+	    }
     }
-    
 
-    /* RADIUS packet */
+
+
+
+    /* RADIUS incoming packet - START */
     if (ntohs(udph->source) == RADIUS_PORT)
     {
 		struct radius_packet *rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
-		lispd_log_msg(LISP_LOG_INFO, "\tIncoming RADIUS Access-Request");
+		lispd_log_msg(LISP_LOG_INFO, "\tIncoming RADIUS Access-Request, code = %u", rpacket->code );
 
 		if (rpacket->code == RADIUS_CODE_ACCESS_ACCEPT)
 		{
 
-			uint8_t *eid = -1;
-			char eid_str[20];
-			char lisp_key[50];
+			uint8_t *eid;
+			char eid_str[20]; memset(eid_str, 0, sizeof(eid_str));
+			char lisp_key[50]; memset(lisp_key, 0, sizeof(lisp_key));
+			char username[50]; memset(username, 0, sizeof(username));
 
 			struct radius_attribute *rattribute = rpacket->attrs;
 			while(rattribute != NULL && rattribute->type != 0)
@@ -139,9 +146,17 @@ void process_input_packet(int fd,
 				//lispd_log_msg(LISP_LOG_INFO, "RADIUS attribute type = %d", rattribute->type);
 
 				switch(rattribute->type) {
+					// Here we have the User-Name (type=1) in rattribute
+					case 1: ;
+						strncpy(username, rattribute->value, rattribute->length -2);
+						username[rattribute->length -2] = '\0';
+
+						lispd_log_msg(LISP_LOG_INFO, "\t\tUser-Name: %s", username);
+
+						break;
+
 					// Here we have the Framed-IP-Address (type=8) in rattribute
 					case 8: ;
-
 						eid = (uint8_t * )ntohl(rattribute->value);
 
 						sprintf(eid_str, "%u.%u.%u.%u", eid[0], eid[1], eid[2], eid[3]);
@@ -167,24 +182,73 @@ void process_input_packet(int fd,
 					default: break;
 				}
 
-				rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
+				// if I have everything I need...
+				if (strlen(username) != 0 && strlen(lisp_key) != 0 && strlen(eid_str) != 0)
+					break;
+				else // go on reading...
+					rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
 			}
 
-			if (strlen(lisp_key) != 0 && strlen(eid_str) != 0)
+			if (strlen(username) != 0 && strlen(lisp_key) != 0 && strlen(eid_str) != 0)
 			{
-				lispd_log_msg(LISP_LOG_INFO, "Let's create a new interface!");
+				user_info *user = vector_search_username(&USERS_INFO, username);
 
-				//create_vlan(eid_str);
+				strcpy(user->ms_key, lisp_key);
+				strcpy(user->eid, eid_str);
+
+				lispd_log_msg(LISP_LOG_INFO, "\n\t=> Authentication completed for user '%s'!", username);
+
+				andrea_add_wlan(user);
+
+				andrea_request_map_server(user);
+
+				// when reply is received ->
+				// -> READ RLOC(S) IN MAP-REPLY WHERE NONCE MATCHES
+				// -> SEND MAP-REGISTER TO THAT RLOC
+
+				// ADD FUNCTIONS FOR "PREVIOUS XTR"
+				// -> IF I RECEIVE A MAP-NOTIFY
+				// -> IF THE EID IS ONE OF MY USERS
+				// -> IF THE RLOCS ARE DIFFERENT THAN MINE
+				// ... HE MOVED
+				// -> SEND SMRs
+				// -> DELETE USER FROM VECTOR
+				// -> DELETE USER FROM DNSMASQ (?)
+				// -> DELETE wlan0:X
+				// -> ?
+
+				// How do SMRs work on lispmob?
+				// Do i have to modify Map-Cache (adding MN <-> CNs)?
 			}
 		}
+    } /* RADIUS incoming packet - END */
 
+
+    /* LISP control packet */
+    if(ntohs(udph->dest) == LISP_CONTROL_PORT)
+    {
+    	lispd_pkt_map_reply_t *pkt = (struct lispd_pkt_map_request_t *) CO(udph,sizeof(struct udphdr));
+    	/* Map-Reply */
+		if (pkt->type == LISP_MAP_REPLY)
+		{
+			/* CHECK if it's the one we are waiting for */
+			user_info *user = (user_info *) vector_search_nonce(&USERS_INFO, pkt->nonce);
+			if (user != NULL)
+			{
+				strcpy(user->ms_address, get_char_from_lisp_addr_t(extract_src_addr_from_packet(packet)));
+				user->ms_nonce = -1; // After we used it, we don't need it anymore!
+				user_info_print(user);
+
+				andrea_send_map_register(user);
+			}
+		}
+    	/* Map-Notify */
+		else if (pkt->type == LISP_MAP_NOTIFY)
+		{
+			andrea_check_map_notify(pkt);
+		}
     }
 
-    
-    if ((write(tun_receive_fd, iph, length)) < 0){
-        lispd_log_msg(LISP_LOG_DEBUG_2,"lisp_input: write error: %s\n ", strerror(errno));
-    }
-    
     free(packet);
 }
 

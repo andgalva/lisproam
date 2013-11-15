@@ -45,7 +45,9 @@
 #include "lispd_map_cache_db.h"
 #include "lispd_mapping.h"
 
+#include "andrea/andrea.h"
 
+char WLAN_INTERFACE[50];
 
 #ifdef OPENWRT
 #include <uci.h>
@@ -452,6 +454,10 @@ int handle_lispd_config_file(char * lispdconf_conf_file)
     };
 
     cfg_opt_t opts[] = {
+    	    /* XXX andrea start */
+            CFG_STR("wlan-interface", 0, CFGF_NONE),
+            /* XXX andrea end*/
+
             CFG_SEC("database-mapping",     db_mapping_opts, CFGF_MULTI),
             CFG_SEC("static-map-cache",     mc_mapping_opts, CFGF_MULTI),
             CFG_SEC("map-server",           map_server_opts, CFGF_MULTI),
@@ -479,6 +485,11 @@ int handle_lispd_config_file(char * lispdconf_conf_file)
     exit(EXIT_FAILURE);
     }
 
+    /* XXX andrea start */
+
+    strcpy(WLAN_INTERFACE, cfg_getnstr(cfg, "wlan-interface", 0));
+
+    /* XXX andrea end */
 
     /*
      *  lispd config options

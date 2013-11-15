@@ -476,7 +476,6 @@ int calculate_balancing_vectors (
             b_locators_vecs->balancing_locators_vec =  set_balancing_vector(locators[2], total_weight[2], hcf[2], &(b_locators_vecs->locators_vec_length));
         }
     }
-
     dump_balancing_locators_vec(*b_locators_vecs,mapping,LISP_LOG_DEBUG_1);
 
     return (GOOD);

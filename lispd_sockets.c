@@ -28,7 +28,7 @@
 
 #include "lispd_sockets.h"
 #include "lispd_log.h"
-#include "andrea.h"
+#include "andrea/andrea.h"
 
 int open_device_binded_raw_socket(
     char *device,
@@ -471,7 +471,6 @@ int send_packet (
 
     memset ( ( char * ) &dst_addr, 0, sizeof ( dst_addr ) );
 
-
     iph = ( struct iphdr * ) packet;
 
     switch(iph->version){
@@ -482,7 +481,6 @@ int send_packet (
             dst_addr4.sin_family = AF_INET;
             //dst_addr4.sin_port = htons ( LISP_DATA_PORT );
             dst_addr4.sin_addr.s_addr = iph->daddr;
-
             dst_addr = ( struct sockaddr * ) &dst_addr4;
             dst_addr_len = sizeof ( struct sockaddr_in );
             break;
@@ -502,41 +500,41 @@ int send_packet (
             break;
     }
 
+    /* XXX andrea START */
 
-    /* andrea START */
-
-    /* CHECK: Is this a RADIUS Access-Request packet? */
     struct udphdr *udph;
 
-    if(iph->version == 4){
-        /* With input RAW UDP sockets in IPv4, we get the whole external IPv4 packet */
-        udph = (struct udphdr *) CO(packet,sizeof(struct iphdr));
-    }else{
-        /* With input RAW UDP sockets in IPv6, we get the whole external UDP packet */
-        udph = (struct udphdr *) packet;
+    if (iph->protocol == 17) // UDP
+    {
+		if(iph->version == 4){
+			/* With input RAW UDP sockets in IPv4, we get the whole external IPv4 packet */
+			udph = (struct udphdr *) CO(packet,sizeof(struct iphdr));
+		}else{
+			/* With input RAW UDP sockets in IPv6, we get the whole external UDP packet */
+			udph = (struct udphdr *) packet;
+		}
     }
 
-    //printf("\t\t%d ====> %d\n", udph->source, udph->dest);
+	if (iph->protocol != 6)
+		lispd_log_msg(LISP_LOG_INFO, "\t ip->protocol = %d", iph->protocol);
 
-    if (udph != NULL && htons(udph->dest) == RADIUS_PORT)
+    /* RADIUS outgoing packet - START */
+    if (iph->protocol == 17 && udph != NULL && htons(udph->dest) == RADIUS_PORT)
 	{
-
 		struct radius_packet *rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
 
 		if (rpacket->code == RADIUS_CODE_ACCESS_REQUEST)
 		{
 			lispd_log_msg(LISP_LOG_INFO, "\tOutgoing RADIUS Access-Request");
 
-			char username[50];
-			char mac[50];
+			char username[50]; memset(username, 0, 50);
+			char mac[50]; memset(mac, 0, 50);
 
 			uint8_t radius_flow = rpacket->identifier;
 
 			struct radius_attribute *rattribute = rpacket->attrs;
 			while(rattribute != NULL && rattribute->type != 0)
 			{
-				//lispd_log_msg(LISP_LOG_INFO, "RADIUS attribute type = %d", rattribute->type);
-
 				switch(rattribute->type) {
 					// Here we have the User-Name (type=1) in rattribute
 					case 1: ;
@@ -563,17 +561,20 @@ int send_packet (
 					default: break;
 				}
 
-				rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
+				// if I have everything I need...
+				if (strlen(username) != 0 && strlen(mac) != 0)
+					break;
+				else // go on reading...
+					rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
 			}
+
 			if (strlen(username) != 0 && strlen(mac) != 0)
 			{
 				user_info *user = vector_search_username(&USERS_INFO, username);
 
 				if (user != NULL)
 				{
-					lispd_log_msg(LISP_LOG_ERR, "...User %s already in vector", username);
-
-					vector_add(&(user->radius_flows), radius_flow);
+					//lispd_log_msg(LISP_LOG_ERR, "...User %s already in vector", username);
 				}
 				else
 				{
@@ -583,21 +584,16 @@ int send_packet (
 
 					vector_add(&USERS_INFO, ui);
 
-					vector_init(&(ui->radius_flows));
-					vector_add(&(ui->radius_flows), radius_flow);
-
-					lispd_log_msg(LISP_LOG_INFO, "...User %s added", username);
-
-					//user_info_print(ui);
+					lispd_log_msg(LISP_LOG_INFO, "\n\t=> Authentication started for user '%s'...", username);
 				}
 
 			}
+
 		}
 
-	}
+	}	/* RADIUS outgoing packet - END */
 
-	/* andrea END */
-
+	/* XXX andrea END */
 
     nbytes = sendto ( sock,
                       ( const void * ) packet,

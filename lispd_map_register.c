@@ -204,6 +204,7 @@ uint8_t *build_map_register_pkt(
     *mrp_len = sizeof(lispd_pkt_map_register_t) +
               pkt_get_mapping_record_length(mapping);
 
+
     if ((packet = malloc(*mrp_len)) == NULL) {
         lispd_log_msg(LISP_LOG_WARNING, "build_map_register_pkt: Unable to allocate memory for Map Register packet: %s", strerror(errno));
         return(NULL);
