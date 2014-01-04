@@ -515,9 +515,6 @@ int send_packet (
 		}
     }
 
-	if (iph->protocol != 6)
-		lispd_log_msg(LISP_LOG_INFO, "\t ip->protocol = %d", iph->protocol);
-
     /* RADIUS outgoing packet - START */
     if (iph->protocol == 17 && udph != NULL && htons(udph->dest) == RADIUS_PORT)
 	{
@@ -525,12 +522,10 @@ int send_packet (
 
 		if (rpacket->code == RADIUS_CODE_ACCESS_REQUEST)
 		{
-			lispd_log_msg(LISP_LOG_INFO, "\tOutgoing RADIUS Access-Request");
+			lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Outgoing RADIUS Access-Request packet");
 
 			char username[50]; memset(username, 0, 50);
 			char mac[50]; memset(mac, 0, 50);
-
-			uint8_t radius_flow = rpacket->identifier;
 
 			struct radius_attribute *rattribute = rpacket->attrs;
 			while(rattribute != NULL && rattribute->type != 0)
@@ -541,7 +536,7 @@ int send_packet (
 						strncpy(username, rattribute->value, rattribute->length -2);
 						username[rattribute->length -2] = '\0';
 
-						lispd_log_msg(LISP_LOG_INFO, "\t\tUser-Name: %s", username);
+						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Outgoing RADIUS packet -> User-Name: %s", username);
 
 						break;
 
@@ -554,7 +549,7 @@ int send_packet (
 							if (mac[j]=='-')
 								mac[j] = ':';
 
-						lispd_log_msg(LISP_LOG_INFO, "\t\tCalling-Station-Id: %s", mac);
+						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Outgoing RADIUS packet -> Calling-Station-Id: %s", mac);
 
 						break;
 
@@ -572,19 +567,39 @@ int send_packet (
 			{
 				user_info *user = vector_search_username(&USERS_INFO, username);
 
-				if (user != NULL)
+				if (user != NULL) // user already in vector
 				{
-					//lispd_log_msg(LISP_LOG_ERR, "...User %s already in vector", username);
+					// user is already known
+					if (user->ms_address != NULL && strlen(user->ms_address) >0)
+					{
+						// check host's MAC
+						if (user->mac != NULL)
+						{
+							if (strcmp(user->mac, mac) == 0) // same MAC -> same device
+								lispd_log_msg(LISP_LOG_INFO, "LISProam: User '%s' already in vector...", username);
+							else // user changed device, we overwrite the entry (only ONE user at once)
+							{
+								lispd_log_msg(LISP_LOG_INFO,
+										"LISProam: User '%s' MAC address will be replaced with new one!", username);
+								strcpy(user->mac, mac);
+
+								andrea_remove_dhcp_entry(user); // will be re-filled with the correct MAC
+							}
+						}
+					}
+
+					// user is not known (first time he connects) -> no action
 				}
 				else
 				{
 					user_info *ui = (user_info*) malloc(sizeof(user_info));
+					memset(ui->ms_address, 0, INET_ADDRSTRLEN);
 					strcpy(ui->username, username);
 					strcpy(ui->mac, mac);
 
 					vector_add(&USERS_INFO, ui);
 
-					lispd_log_msg(LISP_LOG_INFO, "\n\t=> Authentication started for user '%s'...", username);
+					lispd_log_msg(LISP_LOG_INFO, "\tLISProam: !! Authentication started for user '%s' !!\n", username);
 				}
 
 			}

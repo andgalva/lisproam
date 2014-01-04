@@ -547,9 +547,7 @@ int select_src_rmt_locators_from_balancing_locators_vec (
     }
     pos = hash%src_vec_len;
 
-    // XXX andrea: FIX outer_src_locator->extended_info
-    //*src_locator =  src_loc_vec[pos];
-    *src_locator = src_mapping->head_v4_locators_list->locator;
+    *src_locator =  src_loc_vec[pos];
 
     switch ((*src_locator)->locator_addr->afi){
     case (AF_INET):
@@ -563,9 +561,7 @@ int select_src_rmt_locators_from_balancing_locators_vec (
     }
     pos = hash%dst_vec_len; pos = 0;
 
-    // XXX andrea: FIX outer_src_locator->extended_info
-    //*dst_locator =  dst_loc_vec[pos];
-    *dst_locator = dst_mapping->head_v4_locators_list->locator;
+    *dst_locator =  dst_loc_vec[pos];
 
     lispd_log_msg(LISP_LOG_DEBUG_3,"select_src_rmt_locators_from_balancing_locators_vec: "
             "src EID: %s, rmt EID: %s, protocol: %d, src port: %d , dst port: %d --> src RLOC: %s, dst RLOC: %s",
@@ -684,9 +680,6 @@ int lisp_output (
     if (src_mapping == NULL){
         return (forward_native(original_packet,original_packet_length));
     }
-    // XXX andrea
-    lispd_log_msg(LISP_LOG_INFO," 3 src_mapping->extended_info==NULL? %s src_mapping->head_v4_locators_list==NULL? %s", src_mapping->extended_info==NULL? "yes" : "no", src_mapping->head_v4_locators_list==NULL? "yes" : "no" );
-    lispd_log_msg(LISP_LOG_INFO," 3 src_mapping->extended_info->outgoing_balancing_locators_vecs.v4_locators_vec_length = %d", ( (lcl_mapping_extended_info*)src_mapping->extended_info)->outgoing_balancing_locators_vecs.v4_locators_vec_length);
 
     entry = lookup_map_cache(tuple.dst_addr);
 
@@ -755,9 +748,7 @@ int lisp_output (
             &encap_packet,
             &encap_packet_size);
 
-    // XXX andrea: FIX outer_src_locator->extended_info
-    //send_packet (((lcl_locator_extended_info *)(outer_src_locator->extended_info))->out_socket,encap_packet,encap_packet_size);
-    send_packet (3,encap_packet,encap_packet_size);
+    send_packet (((lcl_locator_extended_info *)(outer_src_locator->extended_info))->out_socket,encap_packet,encap_packet_size);
 
     free (encap_packet);
 

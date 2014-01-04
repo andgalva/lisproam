@@ -158,7 +158,7 @@ int add_mapping_to_interface (
                 mappings_list->use_ipv6_address = TRUE;
                 break;
             }
-            lispd_log_msg(LISP_LOG_DEBUG_2,"The EID %s/%d has been assigned to the RLOCs of the interface %s",
+            lispd_log_msg(LISP_LOG_DEBUG_2,"The EID %s/%d has already been assigned to the RLOCs of the interface %s",
                     get_char_from_lisp_addr_t(mapping->eid_prefix),
                     mapping->eid_prefix_length,
                     interface->iface_name);

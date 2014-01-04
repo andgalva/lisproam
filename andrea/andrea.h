@@ -15,6 +15,7 @@
 #include "../patricia/patricia.h"
 
 #include <netinet/in.h>
+
 #include "radius.h"
 #include "vector.h"
 #include "dhcp.h"
@@ -24,7 +25,8 @@
 #define RADIUS_CODE_ACCESS_ACCEPT	2
 #define DHCP_PORT					67
 
-#define RADIUS_SERVER_IP			"84.88.81.48"
+#define RADIUS_SERVER_IP_A			"84.88.81.49"
+#define RADIUS_SERVER_IP_B			"84.88.81.48"
 #define HOME_NETWORK				"10.1.1.0"
 #define HOME_ROUTER					"10.1.1.254"
 #define HOME_NETMASK				"255.255.255.0"
@@ -40,14 +42,16 @@ typedef struct user_info {
 	uint64_t ms_nonce;
 
 	int wlan_id;
+
+	int foreign; // 0 = HOME user, 1 = FOREIGN user
 } user_info;
 
 extern vector USERS_INFO;
 static int WLAN_ID = 6;
 extern char WLAN_INTERFACE[50];
 
-void andrea_add_wlan(user_info *user);
-void andrea_request_map_server(user_info *user);
+void andrea_add_local_configuration(user_info *user);
+void andrea_send_map_request(user_info *user);
 void andrea_send_map_register(user_info *user);
 void andrea_check_map_notify(lispd_pkt_map_notify_t *pkt);
 void create_mock_user(int signum);

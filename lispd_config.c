@@ -245,6 +245,12 @@ int handle_uci_lispd_config_file(char *uci_conf_file_path) {
                 map_request_retries = uci_retries;
             }
 
+            /* XXX andrea START*/
+
+            strcpy(WLAN_INTERFACE, uci_lookup_option_string(ctx, s, "wlan_interface"));
+
+            /* XXX andrea END */
+
             continue;
         }
 
@@ -488,6 +494,7 @@ int handle_lispd_config_file(char * lispdconf_conf_file)
     /* XXX andrea start */
 
     strcpy(WLAN_INTERFACE, cfg_getnstr(cfg, "wlan-interface", 0));
+    printf("\n\tWLAN_INTERFACE = %s\n", WLAN_INTERFACE);
 
     /* XXX andrea end */
 

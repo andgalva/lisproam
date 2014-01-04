@@ -362,15 +362,14 @@ int main(int argc, char **argv)
 
 	char command[150];
 
-	// In my case, the RADIUS Server is under the same /24 as the xTR
-	// so we add an additional specific route, unless it can't be reached
+	// In my case, the RADIUS Servers are under the same /24 as the xTR
+	// so we add an additional specific route, unless they can't be reached
 	// when LISP is running
-	sprintf(command, "ip route add %s/32 dev %s", RADIUS_SERVER_IP, tun_dev_name);
+	sprintf(command, "ip route add %s/32 dev %s", RADIUS_SERVER_IP_A, tun_dev_name);
+    system(command);
+	sprintf(command, "ip route add %s/32 dev %s", RADIUS_SERVER_IP_B, tun_dev_name);
     system(command);
 
-    // wlan interface has to be set with an address (ANY) in order to work with dnsmasq
-    sprintf(command, "ifconfig %s 1.1.1.1", WLAN_INTERFACE);
-    system(command);
 
     lispd_log_msg(LISP_LOG_INFO,"\n"
     							"************\n"
@@ -505,6 +504,12 @@ void exit_cleanup(void) {
     close(ipv4_control_input_fd);
 
     /* Close syslog */
+
+    /* XXX andrea start */
+
+    andrea_clean();
+
+    /* XXX andrea end */
 
     exit(EXIT_SUCCESS);
 }

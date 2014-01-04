@@ -130,10 +130,10 @@ void process_input_packet(int fd,
     if (ntohs(udph->source) == RADIUS_PORT)
     {
 		struct radius_packet *rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
-		lispd_log_msg(LISP_LOG_INFO, "\tIncoming RADIUS Access-Request, code = %u", rpacket->code );
 
 		if (rpacket->code == RADIUS_CODE_ACCESS_ACCEPT)
 		{
+			lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Incoming RADIUS Access-Accept packet");
 
 			uint8_t *eid;
 			char eid_str[20]; memset(eid_str, 0, sizeof(eid_str));
@@ -151,7 +151,7 @@ void process_input_packet(int fd,
 						strncpy(username, rattribute->value, rattribute->length -2);
 						username[rattribute->length -2] = '\0';
 
-						lispd_log_msg(LISP_LOG_INFO, "\t\tUser-Name: %s", username);
+						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Incoming RADIUS packet -> User-Name: %s", username);
 
 						break;
 
@@ -161,7 +161,7 @@ void process_input_packet(int fd,
 
 						sprintf(eid_str, "%u.%u.%u.%u", eid[0], eid[1], eid[2], eid[3]);
 
-						lispd_log_msg(LISP_LOG_INFO, "\t\tFramed-IP-Address: %s", eid_str);
+						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Incoming RADIUS packet -> Framed-IP-Address: %s", eid_str);
 
 						break;
 
@@ -175,7 +175,7 @@ void process_input_packet(int fd,
 						strncpy(lisp_key, rattribute->value, rattribute->length -2);
 						lisp_key[rattribute->length -2] = '\0';
 
-						lispd_log_msg(LISP_LOG_INFO, "\t\tReply-Message: %s", lisp_key);
+						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Incoming RADIUS packet -> Reply-Message: %s", lisp_key);
 
 						break;
 
@@ -193,32 +193,36 @@ void process_input_packet(int fd,
 			{
 				user_info *user = vector_search_username(&USERS_INFO, username);
 
+				if (user == NULL)
+				{
+					// should NEVER happen
+					return;
+				}
+
 				strcpy(user->ms_key, lisp_key);
 				strcpy(user->eid, eid_str);
 
-				lispd_log_msg(LISP_LOG_INFO, "\n\t=> Authentication completed for user '%s'!", username);
+				lispd_log_msg(LISP_LOG_INFO, "\tLISProam: !! Authentication completed for user '%s' !!\n", username);
 
-				andrea_add_wlan(user);
+				andrea_add_local_configuration(user);
 
-				andrea_request_map_server(user);
+				 // Home user OR Authentication already over (user known)
+				if (user->foreign == 0 || strlen(user->ms_address)>0)
+				{
+					lispd_log_msg(LISP_LOG_INFO, "\tLISProam: Map-Server already known for user '%s' (%s)\n",
+							user->foreign == 0 ? "home user" : username, user->ms_address);
 
-				// when reply is received ->
-				// -> READ RLOC(S) IN MAP-REPLY WHERE NONCE MATCHES
-				// -> SEND MAP-REGISTER TO THAT RLOC
+					user_info_print(user);
 
-				// ADD FUNCTIONS FOR "PREVIOUS XTR"
-				// -> IF I RECEIVE A MAP-NOTIFY
-				// -> IF THE EID IS ONE OF MY USERS
-				// -> IF THE RLOCS ARE DIFFERENT THAN MINE
-				// ... HE MOVED
-				// -> SEND SMRs
-				// -> DELETE USER FROM VECTOR
-				// -> DELETE USER FROM DNSMASQ (?)
-				// -> DELETE wlan0:X
-				// -> ?
+					andrea_send_map_register(user);
+				}
+				else
+				{
+					lispd_log_msg(LISP_LOG_INFO,
+							"\tLISProam: Map-Server unknown for user '%s'. Retrieving Map-Server.\n", username);
 
-				// How do SMRs work on lispmob?
-				// Do i have to modify Map-Cache (adding MN <-> CNs)?
+					andrea_send_map_request(user);
+				}
 			}
 		}
     } /* RADIUS incoming packet - END */
@@ -235,8 +239,10 @@ void process_input_packet(int fd,
 			user_info *user = (user_info *) vector_search_nonce(&USERS_INFO, pkt->nonce);
 			if (user != NULL)
 			{
+				lispd_log_msg(LISP_LOG_INFO, "\tLISProam: Map-Server address received for user '%s'\n", user->username);
 				strcpy(user->ms_address, get_char_from_lisp_addr_t(extract_src_addr_from_packet(packet)));
 				user->ms_nonce = -1; // After we used it, we don't need it anymore!
+
 				user_info_print(user);
 
 				andrea_send_map_register(user);
