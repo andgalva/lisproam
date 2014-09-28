@@ -72,8 +72,9 @@ void exit_cleanup(void);
 
 
 /* andrea START */
-
+// Vector containing data related to the roaming users
 vector USERS_INFO;
+// Name of the wlan interface of this machine, configured on the lispd conf file
 char WLAN_INTERFACE[50];
 
 /* andrea END */
@@ -132,12 +133,12 @@ int main(int argc, char **argv)
     lisp_addr_t *tun_v6_addr;
     char *tun_dev_name = TUN_IFACE_NAME;
 
-    /* XXX andrea start */
+    /* XXX andrea START */
 
-    // LOCAL testbed
+    // For local testbed, we skip some steps
     signal(SIGUSR1, create_mock_user);
 
-    /* XXX andrea end */
+    /* XXX andrea END */
 
 #ifdef ROUTER
 #ifdef OPENWRT
@@ -359,18 +360,14 @@ int main(int argc, char **argv)
     /* XXX andrea START */
 
     vector_init(&USERS_INFO);
-
 	char command[150];
-
-	// In my case, the RADIUS Servers are under the same /24 as the xTR
-	// so we add an additional specific route, unless they can't be reached
+	// In my environment, the RADIUS Servers are under the same /24 as the xTR
+	// so we add an additional specific route, othervise they can't be reached
 	// when LISP is running
 	sprintf(command, "ip route add %s/32 dev %s", RADIUS_SERVER_IP_A, tun_dev_name);
     system(command);
 	sprintf(command, "ip route add %s/32 dev %s", RADIUS_SERVER_IP_B, tun_dev_name);
     system(command);
-
-
     lispd_log_msg(LISP_LOG_INFO,"\n"
     							"************\n"
     							"**LISProam**\n"
@@ -378,7 +375,6 @@ int main(int argc, char **argv)
     lispd_log_msg(LISP_LOG_INFO,"Waiting for connections on interface: %s", WLAN_INTERFACE);
 
     /* XXX andrea END */
-
 
     event_loop();
 
@@ -505,11 +501,11 @@ void exit_cleanup(void) {
 
     /* Close syslog */
 
-    /* XXX andrea start */
+    /* XXX andrea START */
 
     andrea_clean();
 
-    /* XXX andrea end */
+    /* XXX andrea END */
 
     exit(EXIT_SUCCESS);
 }

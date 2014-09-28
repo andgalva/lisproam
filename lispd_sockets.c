@@ -502,111 +502,87 @@ int send_packet (
 
     /* XXX andrea START */
 
+    // Here we check if we have an outcoming RADIUS Access Request packet
     struct udphdr *udph;
-
-    if (iph->protocol == 17) // UDP
-    {
-		if(iph->version == 4){
-			/* With input RAW UDP sockets in IPv4, we get the whole external IPv4 packet */
+    if (iph->protocol == 17) { // It's UDP
+		if(iph->version == 4) {
+			// With input RAW UDP sockets in IPv4, we get the whole external IPv4 packet
 			udph = (struct udphdr *) CO(packet,sizeof(struct iphdr));
-		}else{
-			/* With input RAW UDP sockets in IPv6, we get the whole external UDP packet */
+		} else {
+			// With input RAW UDP sockets in IPv6, we get the whole external UDP packet
 			udph = (struct udphdr *) packet;
 		}
     }
 
-    /* RADIUS outgoing packet - START */
-    if (iph->protocol == 17 && udph != NULL && htons(udph->dest) == RADIUS_PORT)
-	{
+    // It's UDP and on the RADIUS port
+    if (iph->protocol == 17 && udph != NULL && htons(udph->dest) == RADIUS_PORT) {
 		struct radius_packet *rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
-
-		if (rpacket->code == RADIUS_CODE_ACCESS_REQUEST)
-		{
+		if (rpacket->code == RADIUS_CODE_ACCESS_REQUEST) {
 			lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Outgoing RADIUS Access-Request packet");
-
 			char username[50]; memset(username, 0, 50);
 			char mac[50]; memset(mac, 0, 50);
-
 			struct radius_attribute *rattribute = rpacket->attrs;
-			while(rattribute != NULL && rattribute->type != 0)
-			{
+			// Retrieve user info from the packet
+			while(rattribute != NULL && rattribute->type != 0) {
 				switch(rattribute->type) {
-					// Here we have the User-Name (type=1) in rattribute
+					// User-Name (type=1) in rattribute
 					case 1: ;
 						strncpy(username, rattribute->value, rattribute->length -2);
 						username[rattribute->length -2] = '\0';
-
 						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Outgoing RADIUS packet -> User-Name: %s", username);
-
 						break;
-
-					// Here we have the Calling-Station-Id (type=31) in rattribute
+					// Calling-Station-Id (type=31) in rattribute, which is the MAC
 					case 31: ;
 						strncpy(mac, rattribute->value, rattribute->length -2);
 						mac[rattribute->length -2] = '\0';
 						int j;
-						for(j=0;j<strlen(mac);j++)
-							if (mac[j]=='-')
+						for(j=0;j<strlen(mac);j++) {
+							if (mac[j]=='-') {
 								mac[j] = ':';
-
+							}
+						}
 						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Outgoing RADIUS packet -> Calling-Station-Id: %s", mac);
-
 						break;
-
 					default: break;
 				}
-
-				// if I have everything I need...
-				if (strlen(username) != 0 && strlen(mac) != 0)
+				// If we have everything we need
+				if (strlen(username) != 0 && strlen(mac) != 0) {
 					break;
-				else // go on reading...
+				}
+				else { // go on reading...
 					rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
+				}
 			}
-
-			if (strlen(username) != 0 && strlen(mac) != 0)
-			{
+			if (strlen(username) != 0 && strlen(mac) != 0) {
 				user_info *user = vector_search_username(&USERS_INFO, username);
-
-				if (user != NULL) // user already in vector
-				{
-					// user is already known
-					if (user->ms_address != NULL && strlen(user->ms_address) >0)
-					{
-						// check host's MAC
-						if (user->mac != NULL)
-						{
-							if (strcmp(user->mac, mac) == 0) // same MAC -> same device
+				if (user != NULL) { // User already in vector
+					if (user->ms_address != NULL && strlen(user->ms_address) >0) { // User is KNOWN
+						if (user->mac != NULL) {
+							if (strcmp(user->mac, mac) == 0) { // Same MAC -> Same user
 								lispd_log_msg(LISP_LOG_INFO, "LISProam: User '%s' already in vector...", username);
-							else // user changed device, we overwrite the entry (only ONE user at once)
-							{
+							}
+							else { // Different MAC -> User changed device, we overwrite the entry
 								lispd_log_msg(LISP_LOG_INFO,
 										"LISProam: User '%s' MAC address will be replaced with new one!", username);
 								strcpy(user->mac, mac);
-
-								andrea_remove_dhcp_entry(user); // will be re-filled with the correct MAC
+								andrea_remove_dhcp_entry(user); // Will be re-added later in the process
+								// TODO - Support multiple devices per user (how?)
 							}
 						}
 					}
-
-					// user is not known (first time he connects) -> no action
+					// User is not known, but in vector -> Inconsistent state
 				}
-				else
-				{
+				else { // User not in vector
 					user_info *ui = (user_info*) malloc(sizeof(user_info));
 					memset(ui->ms_address, 0, INET_ADDRSTRLEN);
 					strcpy(ui->username, username);
 					strcpy(ui->mac, mac);
-
 					vector_add(&USERS_INFO, ui);
-
 					lispd_log_msg(LISP_LOG_INFO, "\tLISProam: !! Authentication started for user '%s' !!\n", username);
 				}
-
 			}
-
 		}
-
-	}	/* RADIUS outgoing packet - END */
+	}
 
 	/* XXX andrea END */
 

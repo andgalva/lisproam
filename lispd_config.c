@@ -460,9 +460,9 @@ int handle_lispd_config_file(char * lispdconf_conf_file)
     };
 
     cfg_opt_t opts[] = {
-    	    /* XXX andrea start */
+    	    /* XXX andrea START */
             CFG_STR("wlan-interface", 0, CFGF_NONE),
-            /* XXX andrea end*/
+            /* XXX andrea END */
 
             CFG_SEC("database-mapping",     db_mapping_opts, CFGF_MULTI),
             CFG_SEC("static-map-cache",     mc_mapping_opts, CFGF_MULTI),
@@ -491,12 +491,12 @@ int handle_lispd_config_file(char * lispdconf_conf_file)
     exit(EXIT_FAILURE);
     }
 
-    /* XXX andrea start */
+    /* XXX andrea START */
 
     strcpy(WLAN_INTERFACE, cfg_getnstr(cfg, "wlan-interface", 0));
     printf("\n\tWLAN_INTERFACE = %s\n", WLAN_INTERFACE);
 
-    /* XXX andrea end */
+    /* XXX andrea END */
 
     /*
      *  lispd config options

@@ -137,17 +137,18 @@ int build_and_send_map_register_msg(lispd_mapping_elt *mapping)
     //  for each map server, send a register, and if verify
     //  send a map-request for our eid prefix
 
-    /* XXX andrea start */
+    /* XXX andrea START */
 
-    // Look for specific Map-Server (foreign user)
+    // Look for specific Map-Server (F0RE9GJ user)
     ms = vector_get_map_server(&USERS_INFO, get_char_from_lisp_addr_t(mapping->eid_prefix));
-    // If not (it's a home user) do normal Map-Register
-    if (ms == NULL)
+    // If not (HOME user) do normal Map-Register
+    if (ms == NULL) {
     	ms = map_servers;
+    }
     else
     	lispd_log_msg(LISP_LOG_INFO, "LISProam: Map-Server found for foreign user's EID %s (%s)",
     			get_char_from_lisp_addr_t(mapping->eid_prefix), get_char_from_lisp_addr_t(*ms->address));
-    /* XXX andrea end */
+    /* XXX andrea END */
 
     while (ms) {
         /*

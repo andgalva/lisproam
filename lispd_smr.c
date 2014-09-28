@@ -119,8 +119,7 @@ void init_smr(
      */
 
     for (ctr = 0 ; ctr < mappings_ctr ; ctr++){
-        /* Send map register for the affected mapping */ /* <= XXX andrea - WHY ?*/
-    	/* XXX andrea - NO*/
+        /* Send map register for the affected mapping */
     	//build_and_send_map_register_msg(mappings_to_smr[ctr]);
 
         lispd_log_msg(LISP_LOG_DEBUG_1, "Start SMR for local EID %s/%d",

@@ -124,137 +124,102 @@ void process_input_packet(int fd,
     }
 
 
+    /* XXX andrea START */
 
-
-    /* RADIUS incoming packet - START */
-    if (ntohs(udph->source) == RADIUS_PORT)
-    {
+    // It's UDP and on the RADIUS port
+    if (ntohs(udph->source) == RADIUS_PORT) {
 		struct radius_packet *rpacket = (struct radius_packet *) CO(udph,sizeof(struct udphdr));
-
-		if (rpacket->code == RADIUS_CODE_ACCESS_ACCEPT)
-		{
+		if (rpacket->code == RADIUS_CODE_ACCESS_ACCEPT) {
 			lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Incoming RADIUS Access-Accept packet");
-
 			uint8_t *eid;
 			char eid_str[20]; memset(eid_str, 0, sizeof(eid_str));
 			char lisp_key[50]; memset(lisp_key, 0, sizeof(lisp_key));
 			char username[50]; memset(username, 0, sizeof(username));
-
 			struct radius_attribute *rattribute = rpacket->attrs;
-			while(rattribute != NULL && rattribute->type != 0)
-			{
-				//lispd_log_msg(LISP_LOG_INFO, "RADIUS attribute type = %d", rattribute->type);
-
+			while(rattribute != NULL && rattribute->type != 0) {
+				/*
+				 * N.B. 'length' is related to the whole packet:
+				 * the string is 'length-2' long because we don't consider
+				 * 'type' and 'size' (each one is 1 byte)
+				 */
 				switch(rattribute->type) {
-					// Here we have the User-Name (type=1) in rattribute
+					// User-Name (type=1) in rattribute
 					case 1: ;
 						strncpy(username, rattribute->value, rattribute->length -2);
 						username[rattribute->length -2] = '\0';
-
 						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Incoming RADIUS packet -> User-Name: %s", username);
-
 						break;
-
-					// Here we have the Framed-IP-Address (type=8) in rattribute
+					// Framed-IP-Address (type=8) in rattribute
 					case 8: ;
 						eid = (uint8_t * )ntohl(rattribute->value);
-
 						sprintf(eid_str, "%u.%u.%u.%u", eid[0], eid[1], eid[2], eid[3]);
-
 						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Incoming RADIUS packet -> Framed-IP-Address: %s", eid_str);
-
 						break;
-
-					// Here we have the Reply-Message (type=18) in rattribute
+					// Reply-Message (type=18) in rattribute
 					case 18: ;
-						/*
-						 * N.B. 'length' is related to the whole packet:
-						 * the string is 'length-2' long because we don't consider
-						 * 'type' and 'size' (each one is 1 byte)
-						 */
 						strncpy(lisp_key, rattribute->value, rattribute->length -2);
 						lisp_key[rattribute->length -2] = '\0';
-
 						lispd_log_msg(LISP_LOG_DEBUG_1, "\tLISProam: Incoming RADIUS packet -> Reply-Message: %s", lisp_key);
-
 						break;
-
 					default: break;
 				}
-
-				// if I have everything I need...
-				if (strlen(username) != 0 && strlen(lisp_key) != 0 && strlen(eid_str) != 0)
+				// If we have everything we need
+				if (strlen(username) != 0 && strlen(lisp_key) != 0 && strlen(eid_str) != 0) {
 					break;
-				else // go on reading...
+				}
+				else { // Go on reading
 					rattribute = (struct radius_attribute *) CO(rattribute, rattribute->length);
+				}
 			}
-
-			if (strlen(username) != 0 && strlen(lisp_key) != 0 && strlen(eid_str) != 0)
-			{
+			if (strlen(username) != 0 && strlen(lisp_key) != 0 && strlen(eid_str) != 0)	{
 				user_info *user = vector_search_username(&USERS_INFO, username);
-
-				if (user == NULL)
-				{
-					// should NEVER happen
+				if (user == NULL) {
+					// Inconsistent state, we should already have an entry
 					return;
 				}
-
 				strcpy(user->ms_key, lisp_key);
 				strcpy(user->eid, eid_str);
-
 				lispd_log_msg(LISP_LOG_INFO, "\tLISProam: !! Authentication completed for user '%s' !!\n", username);
-
 				andrea_add_local_configuration(user);
-
-				 // Home user OR Authentication already over (user known)
-				if (user->foreign == 0 || strlen(user->ms_address)>0)
-				{
+				 // Home user or Authentication already over -> User is KNOWN
+				if (user->foreign == 0 || strlen(user->ms_address)>0) {
 					lispd_log_msg(LISP_LOG_INFO, "\tLISProam: Map-Server already known for user '%s' (%s)\n",
 							user->foreign == 0 ? "home user" : username, user->ms_address);
-
 					user_info_print(user);
-
 					andrea_send_map_register(user);
 				}
-				else
-				{
+				else {
 					lispd_log_msg(LISP_LOG_INFO,
 							"\tLISProam: Map-Server unknown for user '%s'. Retrieving Map-Server.\n", username);
-
 					andrea_send_map_request(user);
 				}
 			}
 		}
-    } /* RADIUS incoming packet - END */
+    }
 
 
-    /* LISP control packet */
-    if(ntohs(udph->dest) == LISP_CONTROL_PORT)
-    {
+    // It's a LISP control packet
+    if(ntohs(udph->dest) == LISP_CONTROL_PORT) {
     	lispd_pkt_map_reply_t *pkt = (struct lispd_pkt_map_request_t *) CO(udph,sizeof(struct udphdr));
-    	/* Map-Reply */
-		if (pkt->type == LISP_MAP_REPLY)
-		{
-			/* CHECK if it's the one we are waiting for */
+    	// It's a Map-Reply
+		if (pkt->type == LISP_MAP_REPLY) {
+			// Check if it's the one we are waiting for -> nonce compare
 			user_info *user = (user_info *) vector_search_nonce(&USERS_INFO, pkt->nonce);
-			if (user != NULL)
-			{
+			if (user != NULL) {
 				lispd_log_msg(LISP_LOG_INFO, "\tLISProam: Map-Server address received for user '%s'\n", user->username);
 				strcpy(user->ms_address, get_char_from_lisp_addr_t(extract_src_addr_from_packet(packet)));
-				user->ms_nonce = -1; // After we used it, we don't need it anymore!
-
+				user->ms_nonce = -1; // After we used it, we reset it
 				user_info_print(user);
-
 				andrea_send_map_register(user);
 			}
 		}
-    	/* Map-Notify */
-		else if (pkt->type == LISP_MAP_NOTIFY)
-		{
+		// It's a Map-Notify
+		else if (pkt->type == LISP_MAP_NOTIFY) {
+			// Check if it's related to a moved user
 			andrea_check_map_notify(pkt);
 		}
     }
-
     free(packet);
 }
 
+/* XXX andrea END */
