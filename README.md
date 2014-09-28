@@ -16,6 +16,8 @@ Further info can be found in my ACM publication: "LISP-ROAM: Network-based Host 
 
 The software implementation of LISP-ROAM is a modified version of LISPmob 0.3.2 (http://lispmob.org/).
 
+LISP-ROAM was built to work embedded on a OpenWRT 12.09 router, but it has been tested also on Ubuntu Servers. Its code is not portable outside of a linux environment since it uses specific system calls.
+
 References
 ==========
 * LISP (Locator/ID Separation Protocol) http://lisp.cisco.com/
