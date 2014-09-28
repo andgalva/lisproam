@@ -1,0 +1,116 @@
+CREATE TABLE radcheck (
+id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
+UserName VARCHAR(45),
+Attribute VARCHAR(45),
+Value VARCHAR(45),
+Op VARCHAR(10)
+);
+
+INSERT INTO radcheck VALUES(
+0,
+'alice',
+'Cleartext-Password',
+'alice',
+':='
+);
+
+INSERT INTO radcheck VALUES(
+0,
+'bob',
+'Cleartext-Password',
+'bob',
+':='
+);
+
+CREATE TABLE radreply (
+id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
+UserName VARCHAR(45),
+Attribute VARCHAR(45),
+Value VARCHAR(45),
+Op VARCHAR(10)
+);
+
+INSERT INTO radreply VALUES(
+0,
+'alice',
+'Framed-IP-Address',
+'10.1.2.121',
+':='
+);
+
+INSERT INTO radreply VALUES(
+0,
+'bob',
+'Framed-IP-Address',
+'10.1.1.169',
+':='
+);
+
+CREATE TABLE radgroupreply (
+id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
+GroupName VARCHAR(45),
+Attribute VARCHAR(45),
+Value VARCHAR(45),
+Op VARCHAR(10)
+);
+
+INSERT INTO radgroupreply VALUES(
+0,
+'static',
+'Framed-Protocol',
+'PPP',
+':='
+);
+INSERT INTO radgroupreply VALUES(
+0,
+'static',
+'Service-Type',
+'Framed-User',
+':='
+);
+INSERT INTO radgroupreply VALUES(
+0,
+'static',
+'Reply-Message',
+'lispmob',
+':='
+);
+
+CREATE TABLE radusergroup (
+id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
+UserName VARCHAR(45),
+GroupName VARCHAR(45),
+priority INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT INTO radusergroup VALUES(
+0,
+'alice',
+'static',
+0
+);
+
+INSERT INTO radusergroup VALUES(
+0,
+'bob',
+'static',
+0
+);
+
+CREATE TABLE radgroupcheck (
+id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
+GroupName VARCHAR(45),
+Attribute VARCHAR(45),
+Op VARCHAR(10),
+Value VARCHAR(45)
+);
+
+INSERT INTO radgroupcheck VALUES(
+0,
+'static',
+'NAS-Identifier',
+'==',
+'xtr'
+);
+
+

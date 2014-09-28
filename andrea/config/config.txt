@@ -1,0 +1,6 @@
+Just in case I'll need to get back on this in the future,
+I tar'ed all the config files taken from my testbed, which means:
+- 2 physical OpenWRTs
+- 1 virtual OpenWRT
+- 2 RADIUS Servers
+- 1 mobile host

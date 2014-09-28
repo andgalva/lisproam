@@ -1,0 +1,23 @@
+
+
+	---LISP Map-Server/Resolver--
+	|							|
+	|					  ___  	|
+	|		VirtualOpenWRT__ |	|
+	|			|			||	|
+	|			|			||	|
+	|	Correspondent Node	||	|
+    |     					||	|
+	|						||	|
+	|	RADIUS1				||	|	RADIUS2
+	|	|					||	|	|
+	|	|					||	|	|
+<LISP-A wifi>				<LISP-B wifi>
+ 	OpenWRT1					OpenWRT2
+ 							^
+ 							|
+ 			Mobile Host-----
+ 			
+Mobile host is connected to LISP-B and communicating with CN which is under the VirtualOpenWRT.
+Mobile host attaches to LISP-A and the LISP tunnel will be redirected to OpenWRT1 (from VirtualOpenWRT).
+LISP-ROAM is active on OpenWRT1/2 and will configure Mobile Host with same IP in their network.

@@ -1,0 +1,24 @@
+(See global.txt first)
+
+	---LISP Map-Server/Resolver--
+	|							|
+	|					  ___  	|
+	|		VirtualOpenWRT__ |	|
+	|			|			||	|
+	|			|			||	|
+	|	Correspondent Node	||	|
+    |     					||	|
+	|						||	|
+	|	     				||	|	
+	|	 					||	|	 
+	|	 					||	|	 
+ 	OpenWRT1				OpenWRT2
+ 							^
+ 							|
+ 			Mobile Host-----
+ 			
+ Differently from the global, this testbeds components are all VMs, apart from the Map-Server/Resolver
+ which is hosted in another network.
+ Since the OpenWRT are VMs, they cannot be access points, so the WiFi connection and authentication
+ dialogue cannot take place.
+ The local testbed indeed couldn't reproduce the target scenario of LISP-ROAM...

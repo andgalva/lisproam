@@ -1,0 +1,33 @@
+ctrl_interface=/var/run/wpa_supplicant
+
+ctrl_interface_group=0
+
+eapol_version=1
+
+# 1: wpa_supplicant initiates scanning and AP selection
+# 0: driver takes care of scanning, AP selection, and IEEE 802.11 association
+#    parameters (e.g., WPA IE generation); this mode can also be used with
+#    non-WPA drivers when using IEEE 802.1X mode; do not try to associate with
+#    APs (i.e., external program needs to control association). This mode must
+#    also be used when using wired Ethernet drivers.
+# 2: like 0, but associate with APs using security policy and SSID (but not
+#    BSSID); this can be used, e.g., with ndiswrapper and NDIS driver to
+#    enable operation with hidden SSIDs and optimized roaming; in this mode,
+#    only the first network block in the configuration file is used and this
+#    configuration should have explicit security policy (i.e., only one option
+#    in the lists) for key_mgmt, pairwise, group, proto variables
+ap_scan=0
+
+fast_reauth=1
+
+network={
+	ssid="LISP-A"
+	key_mgmt=WPA-EAP
+	eap=PEAP
+	identity="alice"
+	password="alice"
+	ca_cert=""
+	phase1="peaplabel=1"
+	phase2="auth=MSCHAPV2"
+	priority=10
+}
