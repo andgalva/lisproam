@@ -19,13 +19,9 @@ The software implementation of LISP-ROAM is a modified version of LISPmob 0.3.2 
 References
 ==========
 * LISP (Locator/ID Separation Protocol) http://lisp.cisco.com/
-
 * LISP-ROAM: network-based host mobility with LISP (Publication) http://dl.acm.org/citation.cfm?doid=2645892.2645898
-
-* Support for Network-based User Mobility with LISP (Master's Thesis) (http://bit.ly/thesis-galvani)
-
+* Support for Network-based User Mobility with LISP (Master's Thesis) http://bit.ly/thesis-galvani
 * LISPmob http://lispmob.org/
-
 * LISP-MN https://datatracker.ietf.org/doc/draft-meyer-lisp-mn/
 
 
