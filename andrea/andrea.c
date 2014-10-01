@@ -429,7 +429,7 @@ void create_mock_user(int signum) {
 	strcpy(user->mac, "00:0d:88:65:5a:5d");
 	strcpy(user->eid, "10.1.2.121");
 	strcpy(user->ms_address, "84.88.81.2");
-	strcpy(user->ms_key, "lispmob");
+	strcpy(user->ms_key, "***");
 	lispd_log_msg(LISP_LOG_INFO, "\n\t=> Authentication completed for user '%s'!", user->username);
 	vector_add(&USERS_INFO, user);
 	andrea_add_local_configuration(user);
